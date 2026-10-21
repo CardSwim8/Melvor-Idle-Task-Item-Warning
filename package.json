@@ -1,6 +1,6 @@
 {
   "name": "melvor-task-keeper",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Melvor Idle mod: marks items your Township tasks still need, so you don't sell or use them.",
   "license": "MIT",
   "private": true,
