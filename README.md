@@ -75,8 +75,8 @@ a failed run can simply be retried.
 Uploads use a mod.io OAuth 2 token stored in the repo's `mod.io` GitHub
 environment. To set it up, or renew it when it expires (yearly):
 
-1. Create a token with **read + write** scope at [mod.io/me/access](https://mod.io/me/access).
-2. Run `scripts/setup-modio.sh` in a terminal, logged in to `gh` as the repo owner. It asks for the token (hidden), checks it, finds the Melvor Idle game id and your mod's id, and stores `MODIO_TOKEN`, `MODIO_GAME_ID` and `MODIO_MOD_ID` in the environment.
+1. Create a token with **read + write** scope at [mod.io/me/access](https://mod.io/me/access). If mod.io asks what the token covers, include write access to the mod.
+2. Run `scripts/setup-modio.sh` in a terminal, logged in to `gh` as the repo owner. It asks for the token (hidden) and your mod's mod.io URL, checks the token can upload to that mod (without uploading anything), and stores `MODIO_TOKEN`, `MODIO_GAME_ID` and `MODIO_MOD_ID` in the environment.
 3. Actions → Release → **Run workflow**. Run by hand, it only checks the credentials and prints the mod's name and current version.
 
 Optionally, add **Required reviewers** to the `mod.io` environment (Settings →

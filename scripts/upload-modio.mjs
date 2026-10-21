@@ -59,10 +59,17 @@ async function call(url, init) {
   return body;
 }
 
+// Personal access tokens may be limited to particular resources (no /me), so
+// check upload permission directly: a request with no file is rejected as
+// invalid (422) if the token may upload, or forbidden (403) if not.
 if (args.check) {
   const mod = await call(modUrl);
-  const me = await call(`${api}/me`);
-  console.log(`Token belongs to ${me.username}. Mod ${mod.id} is "${mod.name}"; current release ${mod.modfile?.version ?? "(none)"}.`);
+  console.log(`Mod ${mod.id} is "${mod.name}"; current release ${mod.modfile?.version ?? "(none)"}.`);
+  const probe = new FormData();
+  probe.append("version", "0.0.0-permission-check");
+  const res = await fetch(filesUrl, { method: "POST", body: probe, headers });
+  if (res.status !== 422) fail(`token cannot upload to this mod (HTTP ${res.status}): ${await res.text()}`);
+  console.log("The token can upload to this mod.");
   process.exit(0);
 }
 
