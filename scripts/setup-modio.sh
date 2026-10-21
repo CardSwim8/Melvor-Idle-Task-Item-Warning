@@ -13,8 +13,10 @@
 
 set -euo pipefail
 
-API="${MODIO_API_URL:-https://api.mod.io/v1}"
-GAME_NAMEID="melvoridle"
+# Melvor Idle's mod.io game id. mod.io only accepts writes on the game's own
+# API host (g-<id>.modapi.io); the old api.mod.io host is deprecated.
+GAME_ID=2869
+API="${MODIO_API_URL:-https://g-$GAME_ID.modapi.io/v1}"
 ENV_NAME="mod.io"
 
 repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
@@ -42,12 +44,12 @@ modio() {
 }
 json() { node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);console.log(($1)(j))})"; }
 
-if ! game=$(modio "/games/@$GAME_NAMEID"); then
+if ! game=$(modio "/games/$GAME_ID"); then
   echo "mod.io rejected the token: $game" >&2
   exit 1
 fi
-game_id=$(echo "$game" | json 'j=>j.id')
-echo "Melvor Idle game id: $game_id"
+game_id=$GAME_ID
+echo "Game: $(echo "$game" | json 'j=>j.name') (id $game_id)"
 
 echo
 echo "Which mod should releases go to? Paste its mod.io page URL"
@@ -76,9 +78,14 @@ code=${probe##*$'\n'}
 body=${probe%$'\n'*}
 case "$code" in
   422) echo "Upload permission: yes." ;;
-  *)
-    echo "Upload permission: no (HTTP $code): $body" >&2
+  403)
+    echo "Upload permission: no (HTTP 403): $body" >&2
     echo "Create a token that can write to this mod, then run this again. Nothing was stored." >&2
+    exit 1
+    ;;
+  *)
+    echo "Could not check upload permission (HTTP $code): $body" >&2
+    echo "Nothing was stored." >&2
     exit 1
     ;;
 esac

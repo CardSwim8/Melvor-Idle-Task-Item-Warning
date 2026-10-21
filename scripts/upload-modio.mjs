@@ -8,7 +8,8 @@
 //   MODIO_TOKEN     OAuth 2 access token with write scope (mod.io/me/access)
 //   MODIO_GAME_ID   numeric game id
 //   MODIO_MOD_ID    numeric mod id
-//   MODIO_API_URL   optional; defaults to https://api.mod.io/v1
+//   MODIO_API_URL   optional; defaults to https://g-<game id>.modapi.io/v1 (mod.io
+//                   refuses writes on the deprecated api.mod.io host)
 //
 // Re-running for a version that is already on mod.io does nothing, so a
 // failed workflow can be retried safely.
@@ -35,8 +36,8 @@ function fail(msg) {
 
 const dryRun = args["dry-run"];
 const { MODIO_TOKEN: token, MODIO_GAME_ID: gameId, MODIO_MOD_ID: modId } = process.env;
-const api = (process.env.MODIO_API_URL || "https://api.mod.io/v1").replace(/\/$/, "");
 if (!gameId || !modId) fail("MODIO_GAME_ID and MODIO_MOD_ID must be set");
+const api = (process.env.MODIO_API_URL || `https://g-${gameId}.modapi.io/v1`).replace(/\/$/, "");
 if (!token && !dryRun) fail("MODIO_TOKEN must be set");
 
 const modUrl = `${api}/games/${gameId}/mods/${modId}`;
