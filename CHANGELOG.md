@@ -9,6 +9,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+- New: a Tasks tab in the bank sidebar shows which Township tasks need the selected item, how many to keep, and links straight to each task in Township.
+- Indicators are now always corner badges; the border style option is gone.
+- "Where to show" is simpler: one switch for the bank and one for all skill menus. Items are no longer marked in the shop.
+- Removed the diagnostics report from the settings.
+
 ## [0.2.3]
 
 - First version tracked in this repository. Source rebuilt from the published 0.2.3 bundle; behaviour is unchanged.

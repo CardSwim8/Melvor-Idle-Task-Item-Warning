@@ -187,3 +187,13 @@ test("task goal helpers read delivery and equip goals", () => {
     ["item", "equip"]
   );
 });
+
+test("venues: shop is inactive, bank is its own group, the rest are skills", () => {
+  const { VENUES } = createAdapter();
+  const shop = VENUES.find((v) => v.key === "shop");
+  assert.equal(shop.active, false);
+  assert.equal(VENUES.find((v) => v.key === "bank").group, "bank");
+  const others = VENUES.filter((v) => v.key !== "shop" && v.key !== "bank");
+  assert.ok(others.length > 0);
+  assert.ok(others.every((v) => v.group === "skills" && v.active !== false));
+});

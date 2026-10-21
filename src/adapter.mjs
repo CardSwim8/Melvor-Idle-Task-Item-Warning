@@ -220,39 +220,18 @@ export function createAdapter() {
     return acts;
   }
 
-  let routeStats = [];
-
   function collectRoutes() {
     const routes = [];
-    routeStats = [];
     for (const skill of list(game.skills)) {
-      let made = 0;
-      const dropped = [];
       for (const action of skillActions(skill)) {
         let rs = [];
         try {
           rs = routesForAction(skill, action);
         } catch (e) {}
-        const kept = rs.filter((r) => r.product && r.costs.length);
-        made += kept.length;
-        routes.push(...kept);
-        // Report actions that look like recipes but produced no route, so a
-        // game update that changes a shape shows up in diagnostics.
-        const makesItem = action && (action.product || Array.isArray(action.potions) || isItem(action.produces));
-        const hasInputs =
-          action &&
-          (list(action.itemCosts).length ||
-            action.seedCost ||
-            list(action.fixedItemCosts).length ||
-            list(action.nonShardItemCosts).length ||
-            list(action.alternativeCosts).length ||
-            (action.costs && list(action.costs.items).length));
-        if (makesItem && hasInputs && !kept.length) dropped.push(action.name ?? action.id);
+        routes.push(...rs.filter((r) => r.product && r.costs.length));
       }
-      if (made || dropped.length) routeStats.push({ skill: skill.name ?? skill.id, routes: made, dropped });
     }
 
-    let shopRoutes = 0;
     for (const p of list(game.shop?.purchases)) {
       try {
         const cost = costs(p.costs?.items);
@@ -260,13 +239,10 @@ export function createAdapter() {
         for (const c of list(p.contains?.items)) {
           if (!c?.item) continue;
           routes.push({ shape: "shop", product: c.item, qty: c.quantity || 1, costs: cost, purchase: p });
-          shopRoutes++;
         }
       } catch (e) {}
     }
-    routeStats.push({ skill: "Shop", routes: shopRoutes, dropped: [] });
 
-    let upgradeRoutes = 0;
     const upgrades = game.bank?.itemUpgrades;
     if (upgrades) {
       const seen = new Set();
@@ -275,11 +251,9 @@ export function createAdapter() {
           if (!u || seen.has(u) || u.isDowngrade) continue;
           seen.add(u);
           routes.push({ shape: "upgrade", product: u.upgradedItem, qty: u.upgradedQuantity ?? 1, costs: costs(u.itemCosts), upgrade: true });
-          upgradeRoutes++;
         }
       }
     }
-    routeStats.push({ skill: "Item upgrades", routes: upgradeRoutes, dropped: [] });
 
     return routes.filter((r) => r.product && r.costs.length && isOwned(r.product) && isOwned(r.action ?? r.product));
   }
@@ -335,6 +309,9 @@ export function createAdapter() {
   // Where icons get marked. A zone is either a custom element tag (optionally
   // limited to some of its fields) or a data-tk-zone attribute we add
   // ourselves. Venues with `pages` only match inside those skill pages.
+  // `group` is the setting that switches a venue on or off; a venue with
+  // `active: false` is never marked and has no setting, but keeps its zones
+  // so it can be switched back on.
   const ARTISAN = [
     { tag: "artisan-menu", fields: ["requires", "haves", "recipeDropdownItems"] },
     { tag: "herblore-artisan-menu", fields: ["requires", "haves", "recipeDropdownItems"] }
@@ -344,18 +321,22 @@ export function createAdapter() {
     {
       key: "shop",
       label: "Shop (item costs)",
+      group: "shop",
+      active: false,
       default: true,
       zones: [{ attr: "shop" }]
     },
     {
       key: "bank",
       label: "Bank",
+      group: "bank",
       default: true,
       zones: [{ tag: "bank-item-icon" }, { tag: "bank-selected-item-menu", fields: ["itemImage"] }]
     },
     {
       key: "farming",
       label: "Farming (seed selection)",
+      group: "skills",
       default: true,
       zones: [
         { tag: "farming-seed-select", fields: ["seedButtonContainer"] },
@@ -365,33 +346,37 @@ export function createAdapter() {
     {
       key: "firemaking",
       label: "Firemaking (logs)",
+      group: "skills",
       default: true,
       zones: [{ tag: "firemaking-log-menu", fields: ["logSelectButton", "logOptionsContainer", "logQuantity", "primaryHaves"] }]
     },
     {
       key: "cooking",
       label: "Cooking (ingredients)",
+      group: "skills",
       default: true,
       zones: [
         { tag: "cooking-menu", fields: ["requires", "haves"] },
         { tag: "cooking-recipe-selection", fields: ["costIcons"] }
       ]
     },
-    { key: "smithing", label: "Smithing (ingredients)", pages: ["Smithing"], default: true, zones: ARTISAN },
-    { key: "fletching", label: "Fletching (ingredients)", pages: ["Fletching"], default: true, zones: ARTISAN },
-    { key: "crafting", label: "Crafting (ingredients)", pages: ["Crafting"], default: true, zones: ARTISAN },
-    { key: "runecrafting", label: "Runecrafting (ingredients)", pages: ["Runecrafting"], default: true, zones: ARTISAN },
-    { key: "herblore", label: "Herblore (ingredients)", pages: ["Herblore"], default: true, zones: ARTISAN },
+    { key: "smithing", label: "Smithing (ingredients)", group: "skills", pages: ["Smithing"], default: true, zones: ARTISAN },
+    { key: "fletching", label: "Fletching (ingredients)", group: "skills", pages: ["Fletching"], default: true, zones: ARTISAN },
+    { key: "crafting", label: "Crafting (ingredients)", group: "skills", pages: ["Crafting"], default: true, zones: ARTISAN },
+    { key: "runecrafting", label: "Runecrafting (ingredients)", group: "skills", pages: ["Runecrafting"], default: true, zones: ARTISAN },
+    { key: "herblore", label: "Herblore (ingredients)", group: "skills", pages: ["Herblore"], default: true, zones: ARTISAN },
     {
       key: "agility",
       label: "Agility (obstacle costs)",
+      group: "skills",
       default: true,
       zones: [{ tag: "agility-obstacle-selection", fields: ["costContainer"] }]
     },
-    { key: "summoning", label: "Summoning (ingredients)", pages: ["Summoning"], default: true, zones: ARTISAN },
+    { key: "summoning", label: "Summoning (ingredients)", group: "skills", pages: ["Summoning"], default: true, zones: ARTISAN },
     {
       key: "altMagic",
       label: "Alt. Magic (spell costs)",
+      group: "skills",
       default: true,
       zones: [
         { tag: "alt-magic-menu", fields: ["runeRequirements", "itemRequirementsContainer", "runeHaves", "itemHavesContainer"] },
@@ -445,14 +430,6 @@ export function createAdapter() {
     return null;
   }
 
-  function zoneCounts() {
-    const tags = new Set();
-    for (const v of VENUES) for (const z of v.zones) if (z.tag) tags.add(z.tag);
-    const out = [...tags].map((t) => `${t} ${document.querySelectorAll(t).length}`);
-    out.push(`shop costs ${document.querySelectorAll('[data-tk-zone="shop"]').length}`);
-    return out.join(", ");
-  }
-
   function tagShopCost(ret) {
     try {
       if (ret && ret.image) ret.image.setAttribute("data-tk-zone", "shop");
@@ -488,73 +465,63 @@ export function createAdapter() {
     ["TownshipCasualTasks", "removeTask"]
   ];
 
-  const patchReport = [];
-
   function installPatches(ctx, classes, onChange) {
     for (const [cls, method] of PATCHES) {
       const C = classes[cls];
-      if (!C || typeof C.prototype?.[method] !== "function") {
-        patchReport.push({ patch: `${cls}.${method}`, ok: false });
-        continue;
-      }
+      if (!C || typeof C.prototype?.[method] !== "function") continue;
       try {
         ctx.patch(C, method).after(function (ret) {
           onChange();
           return ret;
         });
-        patchReport.push({ patch: `${cls}.${method}`, ok: true });
       } catch (e) {
-        patchReport.push({ patch: `${cls}.${method}`, ok: false, error: String(e) });
+        console.error(`[Task Keeper] could not hook ${cls}.${method}`, e);
       }
     }
   }
 
-  function selfCheck() {
-    const rows = [];
-    const check = (name, fn) => {
-      try {
-        rows.push({ check: name, result: fn() });
-      } catch (e) {
-        rows.push({ check: name, result: "ERROR: " + e.message });
+  function selectedBankItem() {
+    return game.bank?.selectedBankItem?.item ?? null;
+  }
+
+  // Opens Township on the Tasks page, showing the task's category (or the
+  // casual tasks), and scrolls its card into view. Returns false if the game
+  // would not open Township (e.g. still locked); changePage explains why.
+  function openTownshipTask(task, casual) {
+    const page = game.pages?.getObjectByID?.("melvorD:Township");
+    if (!page || typeof changePage !== "function") return false;
+    // On narrow screens the bank sidebar is an overlay; close it first.
+    if (
+      document.getElementById("bank-sidebar-overlay-container")?.contains(document.getElementById("main-bank-sidebar")) &&
+      typeof closeBankSidebar === "function"
+    ) {
+      closeBankSidebar();
+    }
+    changePage(page, -1, undefined, false, false);
+    if (game.openPage !== page) return false;
+    try {
+      townshipUI.showPage(2 /* TownshipPage.Tasks */);
+      const menu = document.getElementById("township-tasks-menu");
+      const tasks = game.township.tasks;
+      let card;
+      if (casual) {
+        menu.showCasualTasks(tasks, game.township.casualTasks);
+        card = menu.casualTaskMap?.get(task);
+      } else if (task.category) {
+        menu.showCategoryTasks(game, tasks, task.category);
+        card = menu.taskMap?.get(task);
       }
-    };
-    const main = getMainTasks();
-    const pool = getCasualPool();
-    check("Main tasks found", () => main.length);
-    check("Main tasks completed", () => main.filter(isMainTaskComplete).length);
-    check("Casual pool size", () => pool.length);
-    check("Active casual tasks", () => getActiveCasual().length);
-    check("Tasks with item delivery goals", () => [...main, ...pool].filter((t) => getDeliveryGoals(t).length).length);
-    check("Tasks with equipped-item goals", () => [...main, ...pool].filter((t) => getEquipGoals(t).length).length);
-    check("Recipe routes", () => collectRoutes().length);
-    check("Routes per skill", () => routeStats.map((r) => `${r.skill} ${r.routes}`).join(", "));
-    check("Dropped recipes", () => {
-      const d = routeStats.filter((r) => r.dropped.length);
-      return d.length
-        ? d.map((r) => `${r.skill}: ${r.dropped.slice(0, 8).join(", ")}${r.dropped.length > 8 ? ` (+${r.dropped.length - 8})` : ""}`).join("; ")
-        : "none";
-    });
-    check("Equipment sets", () => list(game.combat?.player?.equipmentSets).length);
-    check("Distinct equipped items", () => equippedQuantities().size);
-    check("Item images indexed", () => buildMediaIndex().size);
-    check("Venue pages found", () => [...venuePages().keys()].join(", ") || "NONE");
-    check("Zones on screen now", () => zoneCounts());
-    check("Expansions owned", () =>
-      Object.entries(EXPANSIONS)
-        .map(([ns, e]) => `${e.name}: ${isOwned({ id: ns + ":x" })}`)
-        .join("; ")
-    );
-    const text = [
-      ...rows.map((r) => `${r.check}: ${r.result}`),
-      "",
-      "Change hooks:",
-      ...patchReport.map((p) => `  ${p.ok ? "ok  " : "FAIL"} ${p.patch}${p.error ? " (" + p.error + ")" : ""}`)
-    ].join("\n");
-    console.groupCollapsed("[Task Keeper] self-check");
-    console.table(rows);
-    console.table(patchReport);
-    console.groupEnd();
-    return { rows, patches: patchReport, text };
+      if (card) {
+        requestAnimationFrame(() => card.scrollIntoView({ block: "center", behavior: "smooth" }));
+        card.classList.remove("tk-flash");
+        void card.offsetWidth; // restart the animation if it is already running
+        card.classList.add("tk-flash");
+        setTimeout(() => card.classList.remove("tk-flash"), 2000);
+      }
+    } catch (e) {
+      console.error("[Task Keeper] could not open the task in Township", e);
+    }
+    return true;
   }
 
   return {
@@ -586,6 +553,7 @@ export function createAdapter() {
     buildMediaIndex,
     findItem,
     installPatches,
-    selfCheck
+    selectedBankItem,
+    openTownshipTask
   };
 }

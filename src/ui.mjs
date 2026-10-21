@@ -23,7 +23,7 @@ export function createUI(A, model) {
   }
 
   function inScope(img) {
-    if (img.closest("#tk-tooltip, .tk-section, .tk-sell-note")) return false;
+    if (img.closest("#tk-tooltip, .tk-section, .tk-sell-note, .tk-bank-tab")) return false;
     const venue = A.venueOfIcon(img, pages);
     return !!venue && !!enabled[venue];
   }
@@ -159,6 +159,7 @@ export function createUI(A, model) {
     });
     sweepBadges();
     if (tipTarget) renderTip(tipTarget);
+    renderBankTab();
   }
 
   function rescanAll() {
@@ -231,23 +232,32 @@ export function createUI(A, model) {
     return fmt(line.qty);
   }
 
-  const row = (lead, line, item) =>
-    `<div class="tk-row">${lead}<span class="tk-task">${taskLabel(line, item)}</span><span class="tk-req">${requirement(line)}</span></div>`;
+  // With `links`, task labels become links into Township; each linked line
+  // is pushed onto `links` and found again by its index when clicked. Pool
+  // tasks aren't shown anywhere in Township, so they stay plain text.
+  function row(lead, line, item, links) {
+    let label = taskLabel(line, item);
+    if (links && line.kind !== "pool") {
+      label = `<a href="#" class="tk-task-link" data-tk-line="${links.length}">${label}</a>`;
+      links.push(line);
+    }
+    return `<div class="tk-row">${lead}<span class="tk-task">${label}</span><span class="tk-req">${requirement(line)}</span></div>`;
+  }
 
   const MAX_LINES = 8;
 
-  function sectionHTML(item) {
+  function sectionHTML(item, { max = MAX_LINES, links } = {}) {
     const entry = item && result && result.entries.get(item);
     if (!entry) return "";
     const d = model.describe(item, result, A);
-    let budget = MAX_LINES;
+    let budget = max;
     let total = d.direct.length;
     for (const g of d.groups) total += g.lines.length;
 
     let html = "";
     for (const line of d.direct) {
       if (budget-- <= 0) break;
-      html += row("", line, item);
+      html += row("", line, item, links);
     }
     for (const g of d.groups) {
       if (budget <= 0) break;
@@ -255,12 +265,108 @@ export function createUI(A, model) {
       for (const line of g.lines) {
         if (budget-- <= 0) break;
         const chain = line.chain.map((i) => icon(i)).join('<span class="tk-arrow">→</span>');
-        html += row(`<span class="tk-chain">${chain}${line.locked ? lock() : ""}</span>`, line, g.final);
+        html += row(`<span class="tk-chain">${chain}${line.locked ? lock() : ""}</span>`, line, g.final, links);
       }
     }
-    const shown = MAX_LINES - Math.max(budget, 0);
+    const shown = max - Math.max(budget, 0);
     if (total > shown) html += `<div class="tk-more">+${total - shown} more</div>`;
     return `<div class="tk-section" data-status="${entry.status}">${html}</div>`;
+  }
+
+  // ----------------------------------------------- bank sidebar tab
+
+  // A "Tasks" tab beside the bank sidebar's item, stats and settings tabs,
+  // showing the tooltip's content for the selected item with links into
+  // Township.
+  const TASKS_ICON = "assets/media/skills/township/menu_tasks.png";
+  const BANK_TAB_LINES = 40;
+  let bankTab = null;
+
+  function mediaURL(path) {
+    try {
+      if (typeof assets !== "undefined" && assets.getURI) return assets.getURI(path);
+    } catch (e) {}
+    return path;
+  }
+
+  function installBankTab(sidebar) {
+    if (bankTab || !sidebar) return false;
+    const nav = sidebar.querySelector("ul.nav");
+    const panes = sidebar.paneContainer ?? sidebar.querySelector(".tab-content");
+    if (!nav || !panes) return false;
+
+    const li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML = `<a class="nav-link" href="#tk-bank-tasks-tab" title="Township tasks"><img class="skill-icon-xs m-1" src="${esc(mediaURL(TASKS_ICON))}" alt="Township tasks"></a>`;
+    nav.appendChild(li);
+    const link = li.firstElementChild;
+
+    const pane = document.createElement("div");
+    pane.className = "tab-pane";
+    pane.id = "tk-bank-tasks-tab";
+    pane.setAttribute("role", "tabpanel");
+    const close = sidebar.sidebarCloseButton;
+    if (close && close.parentElement === panes) panes.insertBefore(pane, close);
+    else panes.appendChild(pane);
+
+    // The game wires up its tab links once at startup, so this one needs its
+    // own handler. Bootstrap's tab plugin also deactivates the other tabs.
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      const $ = globalThis.jQuery;
+      if ($?.fn?.tab) return $(link).tab("show");
+      for (const a of nav.querySelectorAll(".nav-link.active")) a.classList.remove("active");
+      for (const p of panes.querySelectorAll(":scope > .tab-pane.active")) p.classList.remove("active", "show");
+      link.classList.add("active");
+      pane.classList.add("active", "show");
+    });
+
+    pane.addEventListener("click", (e) => {
+      const a = e.target.closest?.("a.tk-task-link");
+      if (!a) return;
+      e.preventDefault();
+      const line = bankTab.lines[Number(a.dataset.tkLine)];
+      if (line) A.openTownshipTask(line.task, line.kind === "casual");
+    });
+
+    bankTab = { pane, item: A.selectedBankItem(), lines: [] };
+    renderBankTab();
+    return true;
+  }
+
+  function setBankItem(item) {
+    if (!bankTab) return;
+    bankTab.item = item;
+    renderBankTab();
+  }
+
+  function renderBankTab() {
+    if (!bankTab) return;
+    const item = bankTab.item;
+    const lines = [];
+    const header = `<div class="tk-bank-title"><img class="skill-icon-xs mr-2" src="${esc(mediaURL(TASKS_ICON))}" alt="">Township tasks</div>`;
+    let body;
+    if (!item) {
+      body = `<div class="tk-bank-note">Select an item to see which Township tasks need it.</div>`;
+    } else if (!result) {
+      body = `<div class="tk-bank-note">Working out what your tasks need…</div>`;
+    } else {
+      const entry = result.entries.get(item);
+      if (!entry) {
+        body = `<div class="tk-bank-note">No Township task needs ${esc(item.name)}.</div>`;
+      } else {
+        const held = entry.equipped ? `${fmt(entry.holdings)} (${fmt(entry.equipped)} equipped)` : fmt(entry.holdings);
+        body =
+          `<div class="tk-bank-stats">` +
+          `<span>Keep <strong>${fmt(entry.keep)}</strong></span>` +
+          `<span>Have <strong>${held}</strong></span>` +
+          `<span>Spare <strong>${fmt(entry.safe)}</strong></span>` +
+          `</div>` +
+          sectionHTML(item, { max: BANK_TAB_LINES, links: lines });
+      }
+    }
+    bankTab.lines = lines;
+    bankTab.pane.innerHTML = `<div class="tk-bank-tab">${header}${body}</div>`;
   }
 
   // ----------------------------------------------- game tooltips (tippy)
@@ -475,5 +581,5 @@ export function createUI(A, model) {
     body.insertAdjacentHTML("beforeend", `<div class="tk-sell-note">${n} selected item${n === 1 ? " is" : "s are"} kept for tasks: ${names}</div>`);
   }
 
-  return { start, refresh, setVenue, setPalette, setStyle, annotateSellDialog, installTippyPlugin, sectionHTML };
+  return { start, refresh, setVenue, setPalette, setStyle, annotateSellDialog, installTippyPlugin, sectionHTML, installBankTab, setBankItem };
 }

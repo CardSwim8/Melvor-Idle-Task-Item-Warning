@@ -7,10 +7,13 @@ tasks still need, so you don't sell or use them by accident.
 - **Ingredient** (violet diamond): goes into making something a task needs, through any recipe, shop purchase or item upgrade.
 - **Possible** (sky ring): something the casual task pool could ask for. Can be turned off.
 
-Hover or tap a marked icon to see which tasks want it and the crafting chain
-that leads there. Marks appear in the bank, the shop and the skill menus; each
-place can be switched off in the mod's settings, along with a colorblind
-palette and a corner-badge style.
+Marked icons carry a small corner badge whose shape and color give the status.
+Hover or tap one to see which tasks want it and the crafting chain that leads
+there. In the bank, the selected item's sidebar has a **Tasks** tab with the
+same detail, how many to keep, and links that open each task in Township.
+
+Settings: show or hide the casual task pool, a colorblind palette, and whether
+to mark icons in the bank and in skill menus.
 
 Install it from mod.io through the in-game mod manager.
 
@@ -32,31 +35,27 @@ The zip in `dist/` is exactly what is uploaded to mod.io: `manifest.json`,
 
 ### Layout
 
-| Path                | What it is                                                                                         |
-| ------------------- | -------------------------------------------------------------------------------------------------- |
-| `src/main.mjs`      | Entry point: settings, game hooks, the recompute loop, the console API.                            |
-| `src/adapter.mjs`   | The only code that reads Melvor's globals. Game updates that break the mod usually land here.      |
-| `src/model.mjs`     | Pure logic: what to keep and why. Tested without the game.                                         |
-| `src/ui.mjs`        | Marks icons, renders the tooltip section, badges.                                                  |
-| `src/styles.css`    | Indicator and tooltip styles.                                                                      |
-| `src/manifest.json` | Melvor mod manifest.                                                                               |
-| `scripts/`          | Build/package, changelog extraction, mod.io upload.                                                |
-| `test/`             | `node:test` suites. The model is tested against a fake adapter, the adapter against a fake `game`. |
+| Path                | What it is                                                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main.mjs`      | Entry point: settings, game hooks, the recompute loop, the console API.                                                                   |
+| `src/adapter.mjs`   | The only code that reads Melvor's globals. Game updates that break the mod usually land here.                                             |
+| `src/model.mjs`     | Pure logic: what to keep and why. Tested without the game.                                                                                |
+| `src/ui.mjs`        | Marks icons, renders the tooltip section, badges.                                                                                         |
+| `src/styles.css`    | Indicator and tooltip styles.                                                                                                             |
+| `src/manifest.json` | Melvor mod manifest.                                                                                                                      |
+| `scripts/`          | Build/package, changelog extraction, mod.io upload.                                                                                       |
+| `test/`             | `node:test` suites: the model against a fake adapter, the adapter against a fake `game`, and the whole setup against a fake game and DOM. |
 
 esbuild bundles `src/` into one `setup.mjs`. The build target (`chrome58` in
 `scripts/build.mjs`) matches the 0.2.3 release so older mobile webviews keep
 working; raising it is a deliberate choice.
 
-### Debugging in game
+### Retired options
 
-Settings → Task Keeper → Diagnostics → **Show diagnostics report** gives a
-copyable report for bug reports. From the browser console:
-
-```js
-mod.api.taskKeeper.report(); // same text as the report
-mod.api.taskKeeper.inspect("melvorD:Bird_Nest"); // why one item is marked
-mod.api.taskKeeper.recompute(); // force a recompute; returns items marked
-```
+The shop venue, per-skill "Where to show" switches and the border indicator
+style were taken out of the settings in 0.3.0 but their code is kept. Flip the
+shop's `active` flag in `src/adapter.mjs`, or the flags in `OPTIONS` at the top
+of `src/main.mjs`, to bring one back.
 
 ## Releasing
 

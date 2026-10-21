@@ -4,16 +4,29 @@ import { createAdapter } from "./adapter.mjs";
 import * as model from "./model.mjs";
 import { createUI } from "./ui.mjs";
 
+// Options retired from the settings in 0.3.0. Their code is kept; set one to
+// true to bring it back. (The shop venue is retired in adapter.mjs, through
+// its `active` flag.)
+const OPTIONS = {
+  // One "Where to show" switch per skill, instead of one for all skills.
+  perSkillToggles: false,
+  // Let players choose a border ring instead of the corner badge.
+  indicatorStyle: false
+};
+
+// The "Where to show" switches, one per venue group.
+const GROUPS = {
+  bank: { label: "Bank" },
+  skills: { label: "Skills", hint: "Ingredients, seeds, logs, obstacle and spell costs in skill menus." },
+  shop: { label: "Shop (item costs)" }
+};
+
 export async function setup(ctx) {
   const A = createAdapter();
   const ui = createUI(A, model);
-  const tippyHooked = ui.installTippyPlugin();
+  ui.installTippyPlugin();
   const opts = { showPossible: true };
-  const errors = [];
-  const note = (where, e) => {
-    errors.push(`${where}: ${e?.message ?? e}`);
-    console.error(`[Task Keeper] ${where}`, e);
-  };
+  const note = (where, e) => console.error(`[Task Keeper] ${where}`, e);
 
   let graph = null;
   let result = null;
@@ -39,30 +52,30 @@ export async function setup(ctx) {
   // ----------------------------------------------- settings
 
   const display = ctx.settings.section("Display");
-  display.add([
-    {
-      type: "switch",
-      name: "show-possible",
-      label: "Show items the casual task pool could ask for",
-      hint: "The pool covers many common items, so this marks more of your bank.",
-      default: true,
-      onChange: (value) => {
-        opts.showPossible = value;
-        schedule();
-      }
-    },
-    {
-      type: "dropdown",
-      name: "palette",
-      label: "Border colors",
-      default: "standard",
-      options: [
-        { value: "standard", display: "Standard" },
-        { value: "cb", display: "Colorblind-friendly" }
-      ],
-      onChange: (value) => ui.setPalette(value)
-    },
-    {
+  display.add({
+    type: "switch",
+    name: "show-possible",
+    label: "Show items the casual task pool could ask for",
+    hint: "The pool covers many common items, so this marks more of your bank.",
+    default: true,
+    onChange: (value) => {
+      opts.showPossible = value;
+      schedule();
+    }
+  });
+  display.add({
+    type: "dropdown",
+    name: "palette",
+    label: "Indicator colors",
+    default: "standard",
+    options: [
+      { value: "standard", display: "Standard" },
+      { value: "cb", display: "Colorblind-friendly" }
+    ],
+    onChange: (value) => ui.setPalette(value)
+  });
+  if (OPTIONS.indicatorStyle) {
+    display.add({
       type: "dropdown",
       name: "indicator",
       label: "Indicator style",
@@ -73,84 +86,28 @@ export async function setup(ctx) {
         { value: "badge", display: "Corner badge" }
       ],
       onChange: (value) => ui.setStyle(value)
-    }
-  ]);
+    });
+  }
+
+  // Each switch turns a set of venues on or off.
+  const activeVenues = A.VENUES.filter((v) => v.active !== false);
+  const toggles = OPTIONS.perSkillToggles
+    ? activeVenues.map((v) => ({ name: `venue-${v.key}`, label: v.label, default: v.default, venues: [v] }))
+    : Object.entries(GROUPS)
+        .map(([group, g]) => ({ name: `venue-${group}`, ...g, default: true, venues: activeVenues.filter((v) => v.group === group) }))
+        .filter((t) => t.venues.length);
 
   const where = ctx.settings.section("Where to show");
   where.add(
-    A.VENUES.map((v) => ({
+    toggles.map((t) => ({
       type: "switch",
-      name: `venue-${v.key}`,
-      label: v.label,
-      default: v.default,
-      onChange: (value) => ui.setVenue(v.key, value)
+      name: t.name,
+      label: t.label,
+      ...(t.hint ? { hint: t.hint } : {}),
+      default: t.default,
+      onChange: (value) => t.venues.forEach((v) => ui.setVenue(v.key, value))
     }))
   );
-
-  // ----------------------------------------------- diagnostics
-
-  function report() {
-    let text;
-    try {
-      text = A.selfCheck().text;
-    } catch (e) {
-      text = "Self-check failed: " + e.message;
-    }
-    const header = [
-      "Task Keeper report",
-      `Game version: ${typeof gameVersion !== "undefined" ? gameVersion : "unknown"}`,
-      `User agent: ${navigator.userAgent}`,
-      `Items marked: ${result?.entries.size ?? "not computed"}`,
-      `Merged into game tooltips: ${tippyHooked ? "yes" : "no (using own tooltip)"}`,
-      ""
-    ];
-    const errs = errors.length ? ["", "Errors:", ...errors.slice(-10)] : ["", "Errors: none"];
-    return [...header, text, ...errs].join("\n");
-  }
-
-  function getSwal() {
-    if (typeof SwalLocale !== "undefined") return SwalLocale;
-    if (typeof Swal !== "undefined") return Swal;
-    return null;
-  }
-
-  function showText(title, text) {
-    const swal = getSwal();
-    if (!swal) {
-      alert(text);
-      return;
-    }
-    const box = document.createElement("div");
-    box.innerHTML = `
-      <textarea readonly style="width:100%;height:50vh;font:12px/1.4 monospace;white-space:pre-wrap;"></textarea>
-      <button type="button" class="btn btn-sm btn-primary mt-2">Copy text</button>`;
-    const area = box.querySelector("textarea");
-    area.value = text;
-    box.querySelector("button").addEventListener("click", async (ev) => {
-      area.select();
-      let ok;
-      try {
-        await navigator.clipboard.writeText(text);
-        ok = true;
-      } catch (e) {
-        ok = document.execCommand ? document.execCommand("copy") : false;
-      }
-      ev.target.textContent = ok ? "Copied" : "Select the text above and copy it";
-    });
-    swal.fire({ title, html: box, width: "42rem" });
-  }
-
-  function showReport() {
-    showText("Task Keeper diagnostics", report());
-  }
-
-  ctx.settings.section("Diagnostics").add({
-    type: "button",
-    name: "show-report",
-    display: "Show diagnostics report",
-    hint: "Shows what the mod found in your game, for troubleshooting.",
-    onClick: showReport
-  });
 
   // ----------------------------------------------- game hooks
 
@@ -162,14 +119,16 @@ export async function setup(ctx) {
   };
   A.installPatches(ctx, classes, schedule);
 
-  try {
-    if (typeof ShopCostsAndUnlock !== "undefined") {
-      ctx.patch(ShopCostsAndUnlock, "createCostElement").after((ret) => A.tagShopCost(ret));
-    } else {
-      note("shop costs", "ShopCostsAndUnlock not found");
+  if (activeVenues.some((v) => v.key === "shop")) {
+    try {
+      if (typeof ShopCostsAndUnlock !== "undefined") {
+        ctx.patch(ShopCostsAndUnlock, "createCostElement").after((ret) => A.tagShopCost(ret));
+      } else {
+        note("shop costs", "ShopCostsAndUnlock not found");
+      }
+    } catch (e) {
+      note("shop costs", e);
     }
-  } catch (e) {
-    note("shop costs", e);
   }
 
   try {
@@ -190,6 +149,22 @@ export async function setup(ctx) {
     note("sell note", e);
   }
 
+  // The bank sidebar's Tasks tab follows the selected item.
+  try {
+    if (typeof BankSidebarMenuElement !== "undefined") {
+      ctx.patch(BankSidebarMenuElement, "setItem").after((ret, bankItem) => {
+        ui.setBankItem(bankItem?.item ?? null);
+      });
+      ctx.patch(BankSidebarMenuElement, "setUnselected").after(() => {
+        ui.setBankItem(null);
+      });
+    } else {
+      note("bank tab", "BankSidebarMenuElement not found");
+    }
+  } catch (e) {
+    note("bank tab", e);
+  }
+
   // ----------------------------------------------- lifecycle
 
   ctx.onCharacterLoaded(() => {
@@ -204,37 +179,23 @@ export async function setup(ctx) {
   ctx.onInterfaceReady(() => {
     try {
       ui.setPalette(display.get("palette"));
-      ui.setStyle(display.get("indicator"));
-      for (const v of A.VENUES) {
-        const saved = where.get(`venue-${v.key}`);
-        ui.setVenue(v.key, typeof saved === "boolean" ? saved : v.default);
+      ui.setStyle(OPTIONS.indicatorStyle ? display.get("indicator") : "badge");
+      for (const t of toggles) {
+        const saved = where.get(t.name);
+        const on = typeof saved === "boolean" ? saved : t.default;
+        t.venues.forEach((v) => ui.setVenue(v.key, on));
       }
       ui.start();
       recompute();
     } catch (e) {
       note("starting UI", e);
     }
+    try {
+      if (!ui.installBankTab(document.getElementById("main-bank-sidebar"))) note("bank tab", "bank sidebar not found");
+    } catch (e) {
+      note("bank tab", e);
+    }
     // Safety net for changes no hook catches.
     setInterval(schedule, 1e4);
-    try {
-      A.selfCheck();
-    } catch (e) {
-      note("self-check", e);
-    }
-  });
-
-  // Console access: mod.api.taskKeeper.report(), .inspect("melvorD:Bird_Nest")
-  ctx.api({
-    selfCheck: () => A.selfCheck(),
-    report,
-    recompute: () => {
-      recompute();
-      return result?.entries.size ?? 0;
-    },
-    inspect: (itemID) => {
-      const item = A.findItem(itemID);
-      if (!item) return `No item with id "${itemID}" (use the full id, e.g. "melvorD:Bird_Nest")`;
-      return result?.entries.get(item) ?? "Not needed for any task";
-    }
   });
 }
