@@ -1,0 +1,83 @@
+name: Release
+
+# Push a tag like v0.2.4 to publish: builds the zip, uploads it to mod.io as
+# the current release, and creates a GitHub Release with the same notes.
+#
+# Run it by hand ("Run workflow") to check the mod.io credentials without
+# uploading anything.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Holds MODIO_TOKEN (secret) and MODIO_GAME_ID / MODIO_MOD_ID (variables).
+    # Add required reviewers to it in Settings -> Environments to gate uploads.
+    environment: mod.io
+    env:
+      MODIO_TOKEN: ${{ secrets.MODIO_TOKEN }}
+      MODIO_GAME_ID: ${{ vars.MODIO_GAME_ID }}
+      MODIO_MOD_ID: ${{ vars.MODIO_MOD_ID }}
+      MODIO_API_URL: ${{ vars.MODIO_API_URL }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check mod.io credentials
+        if: github.event_name == 'workflow_dispatch'
+        run: node scripts/upload-modio.mjs --check
+
+      - name: Check tag matches package.json
+        if: github.event_name == 'push'
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version. Bump package.json (npm version) and tag that commit."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Lint, test, build
+        if: github.event_name == 'push'
+        run: npm run check
+
+      - name: Release notes
+        if: github.event_name == 'push'
+        run: node scripts/changelog.mjs "${{ steps.version.outputs.version }}" > "$RUNNER_TEMP/notes.md"
+
+      - name: Upload to mod.io
+        if: github.event_name == 'push'
+        run: >
+          node scripts/upload-modio.mjs
+          --file "dist/task-keeper-v${{ steps.version.outputs.version }}.zip"
+          --version "${{ steps.version.outputs.version }}"
+          --changelog-file "$RUNNER_TEMP/notes.md"
+
+      - name: GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          zip="dist/task-keeper-v${{ steps.version.outputs.version }}.zip"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$zip" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$zip" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+          fi

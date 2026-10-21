@@ -1,0 +1,14 @@
+# Changelog
+
+All notable changes to Task Keeper. The section for a version becomes its
+release notes on GitHub and its changelog on mod.io, so write it for players.
+mod.io shows it as plain text: keep each entry on one line.
+
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follow
+[Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+## [0.2.3]
+
+- First version tracked in this repository. Source rebuilt from the published 0.2.3 bundle; behaviour is unchanged.

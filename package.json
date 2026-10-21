@@ -1,0 +1,33 @@
+{
+  "name": "melvor-task-keeper",
+  "version": "0.2.3",
+  "description": "Melvor Idle mod: marks items your Township tasks still need, so you don't sell or use them.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CardSwim8/Melvor-Idle-Task-Item-Warning.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "test": "node --test",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm run format:check && npm test && npm run build",
+    "changelog": "node scripts/changelog.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.13.0",
+    "fflate": "^0.8.3",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10"
+  }
+}

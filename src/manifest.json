@@ -1,0 +1,5 @@
+{
+  "namespace": "taskKeeper",
+  "setup": "setup.mjs",
+  "load": ["styles.css"]
+}
