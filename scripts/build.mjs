@@ -47,10 +47,12 @@ function validateManifest() {
 }
 
 // Fixed timestamps so the same source always produces the same zip bytes.
+// Zip stores local time, so the date is built in local time too; a UTC date
+// would give different bytes in different timezones.
 function makeZip() {
   const files = {};
   for (const f of [manifest.setup, ...STATIC]) {
-    files[f] = [readFileSync(join(out, f)), { mtime: new Date("2000-01-01T00:00:00Z") }];
+    files[f] = [readFileSync(join(out, f)), { mtime: new Date(2000, 0, 1) }];
   }
   const zip = zipSync(files, { level: 9 });
   const name = `task-keeper-v${pkg.version}.zip`;
