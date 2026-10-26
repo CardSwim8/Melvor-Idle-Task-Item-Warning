@@ -1,0 +1,52 @@
+name: Update mod.io page
+
+# Run by hand (Actions -> Update mod.io page -> Run workflow) to update the
+# mod.io page from modio/: name, summary, description, homepage link, and
+# optionally the logo and tags. "Dry run" (the default) only shows what would
+# change.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: show what would change, send nothing"
+        type: boolean
+        default: true
+      logo:
+        description: "Also upload the logo (modio/page.json -> logo)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modio-page
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    # Same credentials as the Release workflow.
+    environment: mod.io
+    env:
+      MODIO_TOKEN: ${{ secrets.MODIO_TOKEN }}
+      MODIO_GAME_ID: ${{ vars.MODIO_GAME_ID }}
+      MODIO_MOD_ID: ${{ vars.MODIO_MOD_ID }}
+      MODIO_API_URL: ${{ vars.MODIO_API_URL }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Update the page
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          LOGO: ${{ inputs.logo }}
+        run: |
+          args=()
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          [ "$LOGO" = "true" ] && args+=(--logo)
+          node scripts/update-modio-page.mjs "${args[@]}"

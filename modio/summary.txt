@@ -1,0 +1,1 @@
+Marks the items your Township tasks still need, and the ingredients that go into them, so you don't sell or use them by accident. Hover a marked item to see which tasks want it; the bank sidebar shows how many to keep.

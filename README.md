@@ -43,7 +43,7 @@ The zip in `dist/` is exactly what is uploaded to mod.io: `manifest.json`,
 | `src/ui.mjs`        | Marks icons, renders the tooltip section, badges.                                                                                         |
 | `src/styles.css`    | Indicator and tooltip styles.                                                                                                             |
 | `src/manifest.json` | Melvor mod manifest.                                                                                                                      |
-| `scripts/`          | Build/package, changelog extraction, mod.io upload.                                                                                       |
+| `scripts/`          | Build/package, changelog extraction, mod.io upload and page update.                                                                       |
 | `test/`             | `node:test` suites: the model against a fake adapter, the adapter against a fake `game`, and the whole setup against a fake game and DOM. |
 
 esbuild bundles `src/` into one `setup.mjs`. The build target (`chrome58` in
@@ -80,6 +80,24 @@ environment. To set it up, or renew it when it expires (yearly):
 
 Optionally, add **Required reviewers** to the `mod.io` environment (Settings →
 Environments) so every upload waits for your approval.
+
+### The mod.io page
+
+The page's name, summary, description and homepage link come from `modio/`
+(`page.json`, `summary.txt`, `description.html`). To publish changes to them:
+
+1. Edit the files and push.
+2. Actions → **Update mod.io page** → Run workflow, with **Dry run** ticked
+   (the default). It shows what would change, and lists the tags Melvor Idle
+   allows, if mod.io has a tag list for it.
+3. Run it again with **Dry run** unticked. To replace the logo too, set
+   `"logo"` in `modio/page.json` to an image in the repo (at least 512×288,
+   16:9 is best) and tick **Also upload the logo**.
+
+To manage tags, add `"tags": ["…"]` to `modio/page.json` using names from
+the dry run; the page's tags are then set to exactly that list. Without
+`tags`, the page's tags are left alone. A test checks the summary fits
+mod.io's 250 characters.
 
 ## License
 

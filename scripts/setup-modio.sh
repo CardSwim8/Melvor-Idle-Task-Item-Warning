@@ -55,12 +55,50 @@ echo
 echo "Which mod should releases go to? Paste its mod.io page URL"
 read -rp "(like https://mod.io/g/melvoridle/m/your-mod) or its numeric id: " which
 which=$(printf %s "$which" | tr -d '[:space:]')
+
+# The token owner's own Melvor Idle mods, hidden and not-yet-live ones
+# included, which the public listing leaves out. If mod.io refuses (tokens
+# limited to particular resources may not read /me), says why on stderr and
+# prints nothing.
+my_mods() {
+  local reply code
+  reply=$(curl -sS --max-time 30 -w $'\n%{http_code}' "${auth[@]}" "$API/me/mods?game_id=$game_id$1") || return 0
+  code=${reply##*$'\n'}
+  if [ "$code" = "200" ]; then
+    printf %s "${reply%$'\n'*}"
+  else
+    echo "(mod.io wouldn't list your own mods: HTTP $code $(printf %s "${reply%$'\n'*}" | head -c 300))" >&2
+  fi
+}
+# How many mods a listing holds; 0 for an empty or unreadable reply.
+count() { printf %s "$1" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let n=0;try{n=(JSON.parse(s).data||[]).length}catch(e){}console.log(n)})'; }
+
 if [[ "$which" =~ ^[0-9]+$ ]]; then
-  mod=$(modio "/games/$game_id/mods/$which")
+  if ! mod=$(modio "/games/$game_id/mods/$which"); then
+    echo "mod.io has no Melvor Idle mod $which that this token can see: $mod" >&2
+    exit 1
+  fi
 elif [[ "$which" =~ /m/([^/?#]+) ]]; then
-  found=$(modio "/games/$game_id/mods?name_id=${BASH_REMATCH[1]}")
-  [ "$(echo "$found" | json 'j=>j.data.length')" = "1" ] || { echo "No Melvor Idle mod has the URL name ${BASH_REMATCH[1]}." >&2; exit 1; }
-  mod=$(echo "$found" | json 'j=>JSON.stringify(j.data[0])')
+  name_id=${BASH_REMATCH[1]}
+  found=$(modio "/games/$game_id/mods?name_id=$name_id")
+  # Hidden mods aren't in the public listing; look in the owner's own mods.
+  [ "$(count "$found")" = "1" ] || found=$(my_mods "&name_id=$name_id")
+  if [ "$(count "$found")" != "1" ]; then
+    echo "Couldn't find a Melvor Idle mod with the URL name \"$name_id\"." >&2
+    mine=$(my_mods "")
+    if [ "$(count "$mine")" -gt 0 ]; then
+      echo "Your Melvor Idle mods (id, name, URL name):" >&2
+      printf %s "$mine" | json 'j=>j.data.map(m=>`  ${m.id}  ${m.name}  (${m.name_id})`).join("\n")' >&2
+      echo "Run this again and enter the id." >&2
+    else
+      echo "mod.io didn't list any Melvor Idle mods for this token. If the mod is hidden, either:" >&2
+      echo "  - run this again with its numeric id instead of the URL, or" >&2
+      echo "  - make a token at https://mod.io/me/access that isn't limited to particular resources, or" >&2
+      echo "  - make the mod public for a moment, run this, and hide it again." >&2
+    fi
+    exit 1
+  fi
+  mod=$(printf %s "$found" | json 'j=>JSON.stringify(j.data[0])')
 else
   echo "That is neither a mod.io mod URL nor a number." >&2
   exit 1
