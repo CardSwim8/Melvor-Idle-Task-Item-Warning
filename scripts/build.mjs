@@ -20,7 +20,7 @@ const manifest = JSON.parse(readFileSync(join(src, "manifest.json"), "utf8"));
 
 // Files copied as-is next to the bundle. Every file the manifest names must
 // end up in the zip, which validateManifest checks.
-const STATIC = ["manifest.json", "styles.css"];
+const STATIC = ["manifest.json", "styles.css", "icon.png"];
 
 const options = {
   entryPoints: [join(src, "main.mjs")],

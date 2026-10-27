@@ -31,7 +31,7 @@ npm run format   # apply Prettier
 ```
 
 The zip in `dist/` is exactly what is uploaded to mod.io: `manifest.json`,
-`setup.mjs` and `styles.css` at its root.
+`setup.mjs`, `styles.css` and `icon.png` at its root.
 
 ### Layout
 
@@ -42,6 +42,7 @@ The zip in `dist/` is exactly what is uploaded to mod.io: `manifest.json`,
 | `src/model.mjs`     | Pure logic: what to keep and why. Tested without the game.                                                                                |
 | `src/ui.mjs`        | Marks icons, renders the tooltip section, badges.                                                                                         |
 | `src/styles.css`    | Indicator and tooltip styles.                                                                                                             |
+| `src/icon.png`      | The 64×64 icon the mod manager and sidebar show.                                                                                          |
 | `src/manifest.json` | Melvor mod manifest.                                                                                                                      |
 | `scripts/`          | Build/package, changelog extraction, mod.io upload and page update.                                                                       |
 | `test/`             | `node:test` suites: the model against a fake adapter, the adapter against a fake `game`, and the whole setup against a fake game and DOM. |
@@ -84,15 +85,16 @@ Environments) so every upload waits for your approval.
 ### The mod.io page
 
 The page's name, summary, description and homepage link come from `modio/`
-(`page.json`, `summary.txt`, `description.html`). To publish changes to them:
+(`page.json`, `summary.txt`, `description.html`); the logo is
+`assets/logo.png`. The logo and `src/icon.png` are drawn from Melvor's own item
+and bank art. To publish changes to them:
 
 1. Edit the files and push.
 2. Actions → **Update mod.io page** → Run workflow, with **Dry run** ticked
    (the default). It shows what would change, and lists the tags Melvor Idle
    allows, if mod.io has a tag list for it.
-3. Run it again with **Dry run** unticked. To replace the logo too, set
-   `"logo"` in `modio/page.json` to an image in the repo (at least 512×288,
-   16:9 is best) and tick **Also upload the logo**.
+3. Run it again with **Dry run** unticked. Tick **Also upload the logo** to
+   replace the logo too.
 
 To manage tags, add `"tags": ["…"]` to `modio/page.json` using names from
 the dry run; the page's tags are then set to exactly that list. Without

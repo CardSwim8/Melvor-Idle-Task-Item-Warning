@@ -1,5 +1,6 @@
 {
   "namespace": "taskKeeper",
+  "icon": "icon.png",
   "setup": "setup.mjs",
   "load": ["styles.css"]
 }
