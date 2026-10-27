@@ -9,6 +9,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+## [1.0.0]
+
+- Task Keeper is now stable: no changes to how items are marked since 0.3.0.
+- New icon in the mod manager and the sidebar.
+
 ## [0.3.0]
 
 - New: a Tasks tab in the bank sidebar shows which Township tasks need the selected item, how many to keep, and links straight to each task in Township.
